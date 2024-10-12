@@ -1,8 +1,10 @@
 from .models import Book, Author, BookInstance, Genre
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.views import generic
 from django.views.generic.edit import CreateView, UpdateView
+from django.contrib import messages
+from django.shortcuts import redirect
 
 
 def index(request):
@@ -76,3 +78,38 @@ class AuthorCreate(CreateView):
 class AuthorUpdate(UpdateView):
     model = Author
     fields = ["first_name", "last_name", "date_of_birth", "date_of_death"]
+
+
+def book_delete(request, pk):
+    book = get_object_or_404(Book, pk=pk)
+    try:
+        book.delete()
+        messages.success(
+            request, (f"{book.title} by {book.author.last_name} has been deleted")
+        )
+    except:
+        messages.success(
+            request,
+            ("Copies exist, cannot be deleted."),
+        )
+    return redirect("book_list")
+
+
+def author_delete(request, pk):
+    author = get_object_or_404(Author, pk=pk)
+    try:
+        author.delete()
+        messages.success(
+            request, (author.first_name + " " + author.last_name + " has been deleted")
+        )
+    except:
+        messages.success(
+            request,
+            (
+                author.first_name
+                + " "
+                + author.last_name
+                + " cannot be deleted. Books exist for this author"
+            ),
+        )
+    return redirect("author_list")
