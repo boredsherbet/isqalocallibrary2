@@ -5,6 +5,10 @@ from django.views import generic
 from django.views.generic.edit import CreateView, UpdateView
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+from .forms import LoanBookForm
+import datetime
 
 
 def index(request):
@@ -62,22 +66,54 @@ class LoanedBooksByUserListView(LoginRequiredMixin, generic.ListView):
 
 class BookCreate(CreateView):
     model = Book
-    fields = ["title", "author", "summary", "isbn", "genre"]
+    fields = ["title", "author", "summary", "isbn", "genre", "book_image"]
+
+    def form_valid(self, form):
+        post = form.save(commit=False)
+        post.save()
+        return HttpResponseRedirect(reverse("book_list"))
 
 
 class BookUpdate(UpdateView):
     model = Book
-    fields = ["title", "author", "summary", "isbn", "genre"]
+    fields = ["title", "author", "summary", "isbn", "genre", "book_image"]
+
+    def form_valid(self, form):
+        post = form.save(commit=False)
+        post.save()
+        return HttpResponseRedirect(reverse("book_list"))
 
 
 class AuthorCreate(CreateView):
     model = Author
-    fields = ["first_name", "last_name", "date_of_birth", "date_of_death"]
+    fields = [
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "date_of_death",
+        "author_image",
+    ]
+
+    def form_valid(self, form):
+        post = form.save(commit=False)
+        post.save()
+        return HttpResponseRedirect(reverse("author_list"))
 
 
 class AuthorUpdate(UpdateView):
     model = Author
-    fields = ["first_name", "last_name", "date_of_birth", "date_of_death"]
+    fields = [
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "date_of_death",
+        "author_image",
+    ]
+
+    def form_valid(self, form):
+        post = form.save(commit=False)
+        post.save()
+        return HttpResponseRedirect(reverse("author_list"))
 
 
 def book_delete(request, pk):
@@ -113,3 +149,42 @@ def author_delete(request, pk):
             ),
         )
     return redirect("author_list")
+
+
+class AvailBooksListView(generic.ListView):
+    """Generic class-based view listing all books on loan."""
+
+    model = BookInstance
+    template_name = "catalog/bookinstance_list_available.html"
+    paginate_by = 10
+
+    def get_queryset(self):
+        return BookInstance.objects.filter(status__exact="a").order_by("book__title")
+
+
+def loan_book_librarian(request, pk):
+    """View function for renewing a specific BookInstance by librarian."""
+    book_instance = get_object_or_404(BookInstance, pk=pk)
+
+    # If this is a POST request then process the Form data
+    if request.method == "POST":
+        # Create a form instance and populate it with data from the request (binding):
+        form = LoanBookForm(request.POST, instance=book_instance)
+
+        # Check if the form is valid:
+        if form.is_valid():
+            # process the data in form.cleaned_data as required (set due date and update status of book)
+            book_instance = form.save()
+            book_instance.due_back = datetime.date.today() + datetime.timedelta(weeks=4)
+            book_instance.status = "o"
+            book_instance.save()
+
+            # redirect to a new URL:
+            return HttpResponseRedirect(reverse("all_available"))
+    # If this is a GET (or any other method) create the default form
+    else:
+        form = LoanBookForm(
+            instance=book_instance, initial={"book_title": book_instance.book.title}
+        )
+
+    return render(request, "catalog/loan_book_librarian.html", {"form": form})
